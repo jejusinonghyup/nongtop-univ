@@ -133,7 +133,7 @@
                     <input type="password" id="reg-password" placeholder="본인 확인용 휴대폰 뒷 4자리" maxlength="4" pattern="\d*" inputmode="numeric">
                 </div>
                 
-                <div class="privacy-box">
+                <div class="privacy-box" id="privacy-box">
                     <label class="privacy-label">
                         <input type="checkbox" id="privacy-consent">
                         <span>[필수] 개인정보 수집 및 이용 동의</span>
@@ -145,13 +145,17 @@
                     </div>
                 </div>
 
-                <div class="univ-notice-box">
+                <div class="univ-notice-box" id="notice-box">
                     ⚠️ 안내: 본 이벤트는 농협대학교 학생 한정 참여 가능하며, 해당하지 않을 시 랭킹에 오르더라도 경품 지급이 불가할 수 있습니다.
                 </div>
 
                 <div class="error-text" id="form-error">필수 입력 항목을 확인해 주세요.</div>
                 <button class="btn" id="btn-login" onclick="processLogin()">랭킹전 참가하기</button>
                 <button class="btn btn-rank" onclick="openRankModal()">🏆 실시간 랭킹 보기</button>
+                <div style="text-align:center;margin-top:12px;font-size:13px;color:#666;">
+                    <span id="mode-q">이미 등록하셨나요?</span>
+                    <a href="#" id="mode-toggle" onclick="toggleLoginMode();return false;" style="color:#2e7d32;font-weight:800;text-decoration:underline;margin-left:4px;">기록 이어하기</a>
+                </div>
             </div>
 
             <div id="welcome-box" style="display: none; padding: 10px 0;">
@@ -281,6 +285,17 @@
             } catch (e) { console.warn(e); }
         }
 
+        let loginMode = 'new';   // 'new' 처음 참가 / 'continue' 이미 등록한 사람
+        function toggleLoginMode() {
+            loginMode = loginMode === 'new' ? 'continue' : 'new';
+            const cont = loginMode === 'continue';
+            document.getElementById('privacy-box').style.display = cont ? 'none' : '';
+            document.getElementById('notice-box').style.display = cont ? 'none' : '';
+            document.getElementById('btn-login').innerText = cont ? '기록 이어서 하기' : '랭킹전 참가하기';
+            document.getElementById('mode-q').innerText = cont ? '처음 참가하시나요?' : '이미 등록하셨나요?';
+            document.getElementById('mode-toggle').innerText = cont ? '처음 참가하기' : '기록 이어하기';
+            document.getElementById('form-error').style.display = 'none';
+        }
         async function processLogin() {
             const errorEl = document.getElementById('form-error');
             const btn = document.getElementById('btn-login');
@@ -297,7 +312,7 @@
             if (!/^\d{4}$/.test(phone4)) {
                 errorEl.innerText = "휴대폰 뒷자리 숫자 4개를 정확히 입력해 주세요."; errorEl.style.display = 'block'; return;
             }
-            if (!consentChecked) {
+            if (loginMode === 'new' && !consentChecked) {
                 errorEl.innerText = "개인정보 수집 및 이용에 동의해 주세요."; errorEl.style.display = 'block'; return;
             }
 
@@ -314,10 +329,15 @@
                     if (u.phone4 !== phone4) {
                         errorEl.innerText = "이미 사용 중인 닉네임이거나 휴대폰 뒷자리가 틀립니다.";
                         errorEl.style.display = 'block';
-                        btn.innerText = "랭킹전 참가하기"; btn.style.opacity = "1"; btn.disabled = false;
+                        btn.innerText = (loginMode==="continue"?"기록 이어서 하기":"랭킹전 참가하기"); btn.style.opacity = "1"; btn.disabled = false;
                         return;
                     }
                     topScore = u.topScore || 0; topFloor = u.topFloor || 0;
+                } else if (loginMode === 'continue') {
+                    errorEl.innerText = "등록된 정보를 찾을 수 없어요. 닉네임을 확인하거나 '처음 참가하기'를 눌러 주세요.";
+                    errorEl.style.display = 'block';
+                    btn.innerText = "기록 이어서 하기"; btn.style.opacity = "1"; btn.disabled = false;
+                    return;
                 } else {
                     await userRef.set({
                         nickname: nickname, phone4: phone4, topScore: 0, topFloor: 0, plays: 0, consent: true,
@@ -328,12 +348,12 @@
                 userSession = { nickname: nickname, phone4: phone4, topScore: topScore, topFloor: topFloor };
                 localStorage.setItem(SESSION_KEY, JSON.stringify(userSession));
 
-                btn.innerText = "랭킹전 참가하기"; btn.style.opacity = "1"; btn.disabled = false;
+                btn.innerText = (loginMode==="continue"?"기록 이어서 하기":"랭킹전 참가하기"); btn.style.opacity = "1"; btn.disabled = false;
                 startGame();
             } catch (error) {
                 console.error("DB Login Error:", error);
                 errorEl.innerText = "네트워크 오류가 발생했습니다. 잠시 후 시도해주세요."; errorEl.style.display = 'block';
-                btn.innerText = "랭킹전 참가하기"; btn.style.opacity = "1"; btn.disabled = false;
+                btn.innerText = (loginMode==="continue"?"기록 이어서 하기":"랭킹전 참가하기"); btn.style.opacity = "1"; btn.disabled = false;
             }
         }
 
