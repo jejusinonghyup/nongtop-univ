@@ -53,15 +53,19 @@
   var GLOW_TEX = null;
   function glowTexture(){
     if (GLOW_TEX) return GLOW_TEX;
-    var c = document.createElement('canvas'); c.width = c.height = 256; var x = c.getContext('2d');
-    var g = x.createRadialGradient(128,128,0,128,128,128);
-    g.addColorStop(0.00,'rgba(255,205,50,0.00)');
-    g.addColorStop(0.30,'rgba(255,205,50,0.10)');
-    g.addColorStop(0.52,'rgba(255,210,60,0.80)');
-    g.addColorStop(0.72,'rgba(255,196,40,0.32)');
-    g.addColorStop(1.00,'rgba(255,190,30,0.00)');
-    x.fillStyle = g; x.fillRect(0,0,256,256);
-    GLOW_TEX = new THREE.CanvasTexture(c); return GLOW_TEX;
+    // 캔버스 대신 값을 직접 계산: 색(R,G,B)은 항상 같은 노랑, 투명도(A)만 변함 → 휴대폰 GPU의 색 노이즈(초록 점) 방지
+    var N = 128, data = new Uint8Array(N*N*4);
+    var stops = [[0,0],[0.30,0.10],[0.52,0.80],[0.72,0.32],[1,0]];
+    function alphaAt(r){ for (var s=1;s<stops.length;s++){ if (r<=stops[s][0]){ var a=stops[s-1],b=stops[s],u=(r-a[0])/(b[0]-a[0]); u=u*u*(3-2*u); return a[1]+(b[1]-a[1])*u; } } return 0; }
+    for (var y=0;y<N;y++) for (var x=0;x<N;x++){
+      var r = Math.sqrt((x-N/2+0.5)*(x-N/2+0.5)+(y-N/2+0.5)*(y-N/2+0.5))/(N/2);
+      var o = (y*N+x)*4, al = r>=1 ? 0 : alphaAt(r);
+      data[o]=255; data[o+1]=200; data[o+2]=40; data[o+3]=Math.round(al*255);
+    }
+    var t = new THREE.DataTexture(data, N, N, THREE.RGBAFormat);
+    t.minFilter = THREE.LinearFilter; t.magFilter = THREE.LinearFilter; t.generateMipmaps = false;
+    t.premultiplyAlpha = false; t.needsUpdate = true;
+    GLOW_TEX = t; return GLOW_TEX;
   }
   SKIN.addAura = function(mesh, w, h, d){
     var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:glowTexture(), transparent:true, opacity:0.9, depthWrite:false }));
