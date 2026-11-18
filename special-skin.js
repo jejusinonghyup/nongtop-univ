@@ -1,7 +1,7 @@
 /* 스페셜 상품 상자 스킨
    - 윗면: 상품 이미지를 비율 그대로(상자 윗면 크기에 맞춰) 크게 보여줘요
    - 옆면: 이미지를 상자 크기에 맞춰 늘려서(비율 무시) 입혀요 — 다른 농산물 상자와 같은 방식
-   - 황금빛 아우라(후광) + 반짝이로 스페셜 상자임을 보여줘요
+   - 황금빛 아우라(후광)로 스페셜 상자임을 보여줘요
    필요: three.js, special-images.js */
 (function(){
   var SPECIALS = [
@@ -37,53 +37,55 @@
   function disposeMaterial(m){
     (Array.isArray(m) ? m : [m]).forEach(function(mm){ if (!mm) return; if (mm.map) mm.map.dispose(); mm.dispose(); });
   }
-  var GLOW = new THREE.Color(0x2e2000);
   SKIN.apply = function(mesh, s, w, d, h, keepOld){
     if (!keepOld) disposeMaterial(mesh.material);
     var side = sideTexture(s), top = topTexture(s, w, d);
-    var mk = function(t){ return new THREE.MeshStandardMaterial({ map:t, roughness:0.7, emissive:GLOW }); };
+    var mk = function(t){ return new THREE.MeshStandardMaterial({ map:t, roughness:0.7 }); };   // 다른 농산물 상자와 같은 재질·밝기 (발광 없음)
     var sm = mk(side);
     mesh.material = [sm, sm, mk(top), sm, sm, sm];   // +x, -x, 윗면, 바닥, +z, -z
   };
   SKIN.colorHex = function(s){ return new THREE.Color(s.bg).getHex(); };
 
-  /* ----- 황금빛 아우라 + 반짝이 ----- */
-  var NSP = 16, DOT = null;
-  function dotTexture(){
-    if (DOT) return DOT;
-    var c = document.createElement('canvas'); c.width = c.height = 64; var x = c.getContext('2d');
-    var g = x.createRadialGradient(32,32,0,32,32,32); g.addColorStop(0,'rgba(255,250,200,1)'); g.addColorStop(0.35,'rgba(255,214,64,0.85)'); g.addColorStop(1,'rgba(255,190,0,0)');
-    x.fillStyle = g; x.fillRect(0,0,64,64); DOT = new THREE.CanvasTexture(c); return DOT;
+  /* ----- 황금빛 아우라 (반짝이 없이 은은한 후광만) -----
+     상자 '뒤쪽'에서 퍼지는 부드러운 황금빛 광채가 천천히 숨 쉬듯 밝아졌다 어두워져요. 상자 밝기는 그대로예요.
+     SKIN.intensity 로 전체 세기를 조절해요 (기본 1, 0이면 꺼짐) */
+  SKIN.intensity = 1;
+  var GLOW_TEX = null;
+  function glowTexture(){
+    if (GLOW_TEX) return GLOW_TEX;
+    var c = document.createElement('canvas'); c.width = c.height = 256; var x = c.getContext('2d');
+    var g = x.createRadialGradient(128,128,0,128,128,128);
+    g.addColorStop(0.00,'rgba(255,205,50,0.00)');
+    g.addColorStop(0.30,'rgba(255,205,50,0.10)');
+    g.addColorStop(0.52,'rgba(255,210,60,0.80)');
+    g.addColorStop(0.72,'rgba(255,196,40,0.32)');
+    g.addColorStop(1.00,'rgba(255,190,30,0.00)');
+    x.fillStyle = g; x.fillRect(0,0,256,256);
+    GLOW_TEX = new THREE.CanvasTexture(c); return GLOW_TEX;
   }
   SKIN.addAura = function(mesh, w, h, d){
-    var halo = new THREE.Mesh(new THREE.BoxGeometry(1,1,1),
-      new THREE.MeshBasicMaterial({ color:0xffc400, transparent:true, opacity:0.25, side:THREE.BackSide, depthWrite:false }));
-    mesh.add(halo);
-    var pos = new Float32Array(NSP*3), geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
-    var pts = new THREE.Points(geo, new THREE.PointsMaterial({ map:dotTexture(), color:0xffffff, size:22, sizeAttenuation:false, transparent:true, opacity:0.95, depthWrite:false, blending:THREE.AdditiveBlending }));
-    pts.frustumCulled = false;
-    mesh.add(pts);
-    var seed = []; for (var i=0;i<NSP;i++) seed.push({ x:Math.random()-.5, z:Math.random()-.5, p:Math.random(), v:0.25+Math.random()*0.35 });
-    mesh.userData.aura = { halo:halo, pts:pts, seed:seed, ph:Math.random()*6.28, w:w, h:h, d:d };
+    var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:glowTexture(), transparent:true, opacity:0.9, depthWrite:false }));
+    mesh.add(sp);
+    mesh.userData.aura = { sprite:sp, ph:Math.random()*6.28, base:1 };
     SKIN.updateAura(mesh, w, h, d);
   };
   SKIN.updateAura = function(mesh, w, h, d){
     var a = mesh.userData.aura; if (!a) return;
-    a.w = w; a.h = h; a.d = d; a.halo.scale.set(w*1.12, h*1.45, d*1.12);
+    a.w = w; a.d = d; a.h = h; a.base = Math.max(w, d) * 2.9;
+    a.sprite.scale.set(a.base, a.base, 1);
   };
-  SKIN.tick = function(mesh, t){
+  var FWD = null;
+  SKIN.tick = function(mesh, t, camera){
     var a = mesh.userData.aura; if (!a) return;
-    a.halo.material.opacity = 0.24 + 0.1*Math.sin(t*4 + a.ph);
-    var p = a.pts.geometry.attributes.position.array;
-    for (var i=0;i<NSP;i++){
-      var s = a.seed[i], f = (s.p + t*s.v) % 1;
-      p[i*3]   = s.x*a.w*1.15;
-      p[i*3+1] = -a.h/2 + f*a.h*2.4;
-      p[i*3+2] = s.z*a.d*1.15;
+    if (camera){   // 후광을 카메라가 보는 방향 '뒤쪽'으로 밀어서, 상자 자체는 밝아지지 않고 바깥으로만 빛나게 함
+      FWD = FWD || new THREE.Vector3(); camera.getWorldDirection(FWD);
+      var dist = Math.max(a.w, a.d) * 1.1 + a.h;
+      a.sprite.position.copy(FWD).multiplyScalar(dist);
     }
-    a.pts.geometry.attributes.position.needsUpdate = true;
-    a.pts.material.opacity = 0.7 + 0.3*Math.sin(t*6 + a.ph);
+    var pulse = 0.5 + 0.5*Math.sin(t*2.4 + a.ph);          // 0~1
+    var k = a.base * (0.97 + 0.06*pulse);
+    a.sprite.scale.set(k, k, 1);
+    a.sprite.material.opacity = Math.max(0, Math.min(1, (0.72 + 0.28*pulse) * SKIN.intensity));
   };
   window.NT_SKIN = SKIN;
 })();

@@ -699,7 +699,7 @@
                 if (d.mesh.position.y < -30) { scene.remove(d.mesh); debris.splice(i, 1); }
             }
             const tt = performance.now() / 1000;
-            for (let i = 0; i < boxes.length; i++) { if (boxes[i].isSpecial) SKIN.tick(boxes[i].mesh, tt); }
+            for (let i = 0; i < boxes.length; i++) { if (boxes[i].isSpecial) SKIN.tick(boxes[i].mesh, tt, camera); }
             renderer.render(scene, camera);
         }
     </script>
