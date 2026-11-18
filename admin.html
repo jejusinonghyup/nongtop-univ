@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>농탑 관리자 | 제주시농협</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<style>
+  :root{--green:#00843d;--green-d:#006a31;--gold:#ffb300;--ink:#1f2a24;--mute:#6b7a72;--line:#e3e9e5}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Pretendard,-apple-system,"Malgun Gothic",sans-serif;background:#f3f7f5;color:var(--ink)}
+  [hidden]{display:none!important}
+  header{background:var(--green);color:#fff;padding:14px 20px;display:flex;justify-content:space-between;align-items:center}
+  header h1{margin:0;font-size:18px}
+  main{max-width:1100px;margin:0 auto;padding:18px}
+  .card{background:#fff;border-radius:16px;padding:18px;margin-bottom:16px;box-shadow:0 2px 10px rgba(0,60,30,.06)}
+  .card h2{margin:0 0 12px;font-size:16px;color:var(--green-d)}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+  .stat{background:#f4faf6;border-radius:12px;padding:14px;text-align:center}
+  .stat b{display:block;font-size:26px;color:var(--green-d)}
+  .stat span{font-size:12px;color:var(--mute);font-weight:700}
+  label{font-size:13px;font-weight:700;color:var(--mute);display:block;margin-bottom:4px}
+  input[type=text],input[type=password],input[type=datetime-local],input[type=search]{padding:10px 12px;border:1.5px solid #d4ddd8;border-radius:10px;font:inherit;font-size:14px;width:100%}
+  .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;align-items:end}
+  button{font:inherit;font-weight:800;border:0;border-radius:10px;padding:10px 16px;cursor:pointer;background:var(--green);color:#fff}
+  button.sub{background:#eef3f0;color:var(--green-d)}
+  button.danger{background:#d32f2f}
+  button.sm{padding:5px 10px;font-size:12px}
+  .btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .msg{margin-top:8px;font-size:13px;font-weight:700;min-height:18px}
+  .msg.ok{color:var(--green-d)} .msg.bad{color:#d32f2f}
+  .tools{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;align-items:center}
+  .tools input{max-width:280px}
+  .wrap{overflow-x:auto}
+  table{border-collapse:collapse;width:100%;font-size:13px;white-space:nowrap}
+  th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left}
+  th{background:#f4faf6;cursor:pointer;position:sticky;top:0;color:var(--green-d)}
+  th.sorted::after{content:" ▼"} th.sorted.asc::after{content:" ▲"}
+  td.num{text-align:right}
+  #gate{max-width:360px;margin:12vh auto;text-align:center}
+  .note{font-size:12px;color:var(--mute);line-height:1.6}
+</style>
+</head>
+<body>
+
+<div id="gate" class="card">
+  <h2>🌾 농탑 관리자</h2>
+  <div id="gate-cfg" class="msg bad" hidden>firebase-config.js에 Firebase 설정값을 먼저 넣어주세요.</div>
+  <form id="gate-form"><input id="pw" type="password" placeholder="관리자 비밀번호" autocomplete="current-password">
+    <div class="btns"><button style="width:100%">로그인</button></div></form>
+  <div class="msg bad" id="gate-msg"></div>
+</div>
+
+<div id="app" hidden>
+<header><h1>🌾 농탑 관리자 페이지</h1><button class="sub sm" id="logout">로그아웃</button></header>
+<main>
+  <section class="card">
+    <h2>실시간 현황</h2>
+    <div class="stats">
+      <div class="stat"><b id="s-count">0</b><span>참가자</span></div>
+      <div class="stat"><b id="s-played">0</b><span>기록 보유자</span></div>
+      <div class="stat"><b id="s-max">0</b><span>최고 기록(kg)</span></div>
+      <div class="stat"><b id="s-avg">0</b><span>평균 기록(kg)</span></div>
+      <div class="stat"><b id="s-plays">0</b><span>총 플레이 횟수</span></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>이벤트 기간 설정 <span class="note">(한국시간 기준 · 저장 즉시 모든 참가자 화면에 반영)</span></h2>
+    <div class="row">
+      <div><label for="ev-start">시작 일시</label><input id="ev-start" type="datetime-local"></div>
+      <div><label for="ev-end">마감 일시</label><input id="ev-end" type="datetime-local"></div>
+    </div>
+    <div class="btns"><button id="ev-save">기간 저장</button><button class="sub" id="ev-clear">기간 해제(상시 진행)</button></div>
+    <div class="msg" id="ev-msg"></div>
+    <div class="note" id="ev-now"></div>
+  </section>
+
+  <section class="card">
+    <h2>참가자 목록</h2>
+    <div class="tools">
+      <input id="q" type="search" placeholder="닉네임 검색">
+      <button class="sub" id="csv">CSV 내보내기</button>
+    </div>
+    <div class="wrap"><table>
+      <thead><tr id="thead"></tr></thead><tbody id="tbody"></tbody></table></div>
+    <div class="note" id="tnote"></div>
+  </section>
+
+  <section class="card">
+    <h2>데이터 관리</h2>
+    <div class="btns">
+      <button class="danger" id="reset-scores">기록만 초기화</button>
+      <button class="danger" id="del-all">참가자 전체 삭제</button>
+    </div>
+    <div class="note" style="margin-top:8px">경품 추첨·시상 전에 CSV를 먼저 내려받아 보관하세요. 삭제한 데이터는 복구할 수 없어요.</div>
+    <div class="msg" id="dm-msg"></div>
+  </section>
+
+  <section class="card">
+    <h2>관리자 비밀번호 변경</h2>
+    <div class="row">
+      <div><label>현재 비밀번호</label><input id="pw-old" type="password" autocomplete="off"></div>
+      <div><label>새 비밀번호 (4자 이상)</label><input id="pw-new" type="password" autocomplete="off"></div>
+      <div><label>새 비밀번호 확인</label><input id="pw-new2" type="password" autocomplete="off"></div>
+    </div>
+    <div class="btns"><button id="pw-save">변경</button></div>
+    <div class="msg" id="pw-msg"></div>
+  </section>
+</main>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+(function(){
+'use strict';
+const CFG = window.NT_CONFIG, $ = id => document.getElementById(id);
+const fbReady = !/^YOUR/.test(CFG.firebase.apiKey || 'YOUR');
+let db = null;
+if (fbReady){ firebase.initializeApp(CFG.firebase); db = firebase.firestore(); } else $('gate-cfg').hidden = false;
+const SKEY = 'nongtop_admin_v1';
+
+async function sha256(s){
+  const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('nongtop:'+s));
+  return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+function say(id, text, ok){ const e=$(id); e.textContent=text; e.className='msg '+(ok?'ok':'bad'); }
+
+/* ---------- 로그인 ---------- */
+async function getAdminHash(){
+  const ref = db.doc('config/admin'); const s = await ref.get();
+  if (s.exists && s.data().hash) return s.data().hash;
+  const h = await sha256(CFG.defaultAdminPassword);
+  await ref.set({hash:h, updatedAt: firebase.firestore.FieldValue.serverTimestamp()}); return h;
+}
+async function tryLogin(hash){
+  try{ const real = await getAdminHash(); if (hash === real){ sessionStorage.setItem(SKEY, hash); enter(); return true; } }
+  catch(e){ console.error(e); say('gate-msg','서버에 연결할 수 없어요.'); }
+  return false;
+}
+$('gate-form').addEventListener('submit', async e => {
+  e.preventDefault(); if (!db) return;
+  const ok = await tryLogin(await sha256($('pw').value));
+  if (!ok && !$('gate-msg').textContent) say('gate-msg','비밀번호가 맞지 않아요.');
+});
+$('logout').onclick = () => { sessionStorage.removeItem(SKEY); location.reload(); };
+if (db && sessionStorage.getItem(SKEY)) tryLogin(sessionStorage.getItem(SKEY));
+
+/* ---------- 메인 ---------- */
+let users = [], sortKey = 'topScore', sortAsc = false, filter = '';
+const COLS = [
+  ['rank','순위'],['nickname','닉네임'],['phone4','휴대폰뒷자리'],
+  ['topScore','최고기록(kg)'],['topFloor','최고층'],['plays','플레이'],['createdAt','가입일시'],['_del','']
+];
+function tsText(t){ if(!t||!t.toDate) return ''; return t.toDate().toLocaleString('ko-KR',{timeZone:'Asia/Seoul',hour12:false}); }
+function enter(){
+  $('gate').hidden = true; $('app').hidden = false;
+  $('thead').innerHTML = '';
+  COLS.forEach(([k,l]) => { const th=document.createElement('th'); th.textContent=l; if(k!=='_del'&&k!=='rank'){ th.onclick=()=>{ if(sortKey===k) sortAsc=!sortAsc; else{ sortKey=k; sortAsc=(k==='nickname'); } render(); }; th.dataset.k=k; } $('thead').appendChild(th); });
+  db.collection('users').onSnapshot(s => { users = s.docs.map(d => Object.assign({id:d.id}, d.data())); render(); },
+    e => { console.error(e); alert('참가자 데이터를 불러오지 못했어요. Firestore 규칙을 확인해 주세요.'); });
+  db.doc('config/eventSettings').onSnapshot(s => {
+    const d = s.exists ? s.data() : {};
+    $('ev-start').value = toKstInput(d.startTime); $('ev-end').value = toKstInput(d.endTime);
+    $('ev-now').textContent = d.startTime||d.endTime ? '현재 설정: '+(d.startTime?kst(d.startTime):'제한 없음')+' ~ '+(d.endTime?kst(d.endTime):'제한 없음') : '현재 설정: 기간 제한 없음(상시 진행)';
+  });
+}
+const kst = iso => new Date(iso).toLocaleString('ko-KR',{timeZone:'Asia/Seoul',hour12:false});
+const toKstInput = iso => iso ? new Date(new Date(iso).getTime()+9*3600e3).toISOString().slice(0,16) : '';
+const fromKstInput = v => v ? new Date(v+':00+09:00').toISOString() : null;
+
+function render(){
+  const scores = users.map(u=>u.topScore||0), played = scores.filter(x=>x>0);
+  $('s-count').textContent = users.length; $('s-played').textContent = played.length;
+  $('s-max').textContent = (played.length?Math.max(...played):0).toLocaleString();
+  $('s-avg').textContent = played.length ? Math.round(played.reduce((a,b)=>a+b,0)/played.length).toLocaleString() : 0;
+  $('s-plays').textContent = users.reduce((a,u)=>a+(u.plays||0),0).toLocaleString();
+
+  const byScore = users.slice().sort((a,b)=>(b.topScore||0)-(a.topScore||0));
+  const rankOf = new Map(byScore.map((u,i)=>[u.id,i+1]));
+  let rows = users.slice();
+  if (filter){ const f=filter.toLowerCase(); rows = rows.filter(u => [u.nickname].some(v => (v||'').toLowerCase().includes(f))); }
+  const val = u => sortKey==='createdAt' ? (u.createdAt&&u.createdAt.toMillis?u.createdAt.toMillis():0) : (u[sortKey]??'');
+  rows.sort((a,b)=>{ const x=val(a), y=val(b); const c = typeof x==='number'&&typeof y==='number' ? x-y : String(x).localeCompare(String(y),'ko'); return sortAsc?c:-c; });
+  document.querySelectorAll('#thead th').forEach(th => { th.className = th.dataset.k===sortKey ? 'sorted'+(sortAsc?' asc':'') : ''; });
+  const tb = $('tbody'); tb.innerHTML = '';
+  rows.slice(0,1000).forEach(u => {
+    const tr = document.createElement('tr');
+    const cells = [rankOf.get(u.id), u.nickname, u.phone4||'', (u.topScore||0).toLocaleString(), u.topFloor||0, u.plays||0, tsText(u.createdAt)];
+    cells.forEach((c,i) => { const td=document.createElement('td'); td.textContent=c; if(i===3||i===4||i===5||i===0) td.className='num'; tr.appendChild(td); });
+    const td = document.createElement('td'); const b = document.createElement('button'); b.className='danger sm'; b.textContent='삭제';
+    b.onclick = () => delOne(u); td.appendChild(b); tr.appendChild(td); tb.appendChild(tr);
+  });
+  $('tnote').textContent = rows.length+'명 표시'+(rows.length>1000?' (상위 1000명만 화면에 표시, CSV는 전체)':'');
+}
+$('q').addEventListener('input', e => { filter = e.target.value.trim(); render(); });
+
+/* ---------- 이벤트 기간 ---------- */
+$('ev-save').onclick = async () => {
+  const s = fromKstInput($('ev-start').value), e = fromKstInput($('ev-end').value);
+  if (s && e && new Date(s) >= new Date(e)) return say('ev-msg','마감 일시가 시작 일시보다 늦어야 해요.');
+  try{ await db.doc('config/eventSettings').set({startTime:s, endTime:e, updatedAt: firebase.firestore.FieldValue.serverTimestamp()}); say('ev-msg','저장했어요. 바로 반영돼요.',true); }
+  catch(x){ say('ev-msg','저장에 실패했어요.'); }
+};
+$('ev-clear').onclick = async () => {
+  if (!confirm('기간 제한을 해제하면 상시 진행 상태가 돼요. 계속할까요?')) return;
+  await db.doc('config/eventSettings').set({startTime:null, endTime:null, updatedAt: firebase.firestore.FieldValue.serverTimestamp()}); say('ev-msg','기간 제한을 해제했어요.',true);
+};
+
+/* ---------- CSV ---------- */
+function csvCell(v){ let s = String(v ?? ''); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; return '"' + s.replace(/"/g,'""') + '"'; }
+$('csv').onclick = () => {
+  const byScore = users.slice().sort((a,b)=>(b.topScore||0)-(a.topScore||0));
+  const head = ['순위','닉네임','휴대폰뒷자리','최고기록(kg)','최고층','플레이횟수','가입일시'];
+  const lines = [head.map(csvCell).join(',')].concat(byScore.map((u,i)=>[i+1,u.nickname,u.phone4,u.topScore||0,u.topFloor||0,u.plays||0,tsText(u.createdAt)].map(csvCell).join(',')));
+  const blob = new Blob(['﻿'+lines.join('\r\n')], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  const n = new Date(Date.now()+9*3600e3).toISOString().slice(0,16).replace(/[-:T]/g,''); a.download = 'nongtop_participants_'+n+'.csv'; a.click(); URL.revokeObjectURL(a.href);
+};
+
+/* ---------- 삭제/초기화 ---------- */
+async function delOne(u){
+  if (!confirm(u.nickname+' 님을 삭제할까요?')) return;
+  await db.collection('users').doc(u.id).delete(); await db.collection('ranks').doc(u.id).delete();
+}
+async function chunked(refs, fn){
+  for (let i=0;i<refs.length;i+=400){ const b = db.batch(); refs.slice(i,i+400).forEach(r => fn(b,r)); await b.commit(); }
+}
+$('reset-scores').onclick = async () => {
+  if (!confirm('모든 참가자의 기록(최고 점수·층·플레이 횟수)을 0으로 초기화할까요?')) return;
+  if (prompt('확인을 위해 "초기화"를 입력해 주세요.') !== '초기화') return say('dm-msg','취소했어요.');
+  try{
+    const us = await db.collection('users').get(), rs = await db.collection('ranks').get();
+    await chunked(us.docs.map(d=>d.ref), (b,r)=>b.update(r,{topScore:0,topFloor:0,plays:0}));
+    await chunked(rs.docs.map(d=>d.ref), (b,r)=>b.delete(r));
+    say('dm-msg','기록을 초기화했어요.',true);
+  }catch(e){ console.error(e); say('dm-msg','초기화에 실패했어요.'); }
+};
+$('del-all').onclick = async () => {
+  if (!confirm('참가자 전체를 삭제할까요? 되돌릴 수 없어요.')) return;
+  if (prompt('확인을 위해 "전체삭제"를 입력해 주세요.') !== '전체삭제') return say('dm-msg','취소했어요.');
+  try{
+    const us = await db.collection('users').get(), rs = await db.collection('ranks').get();
+    await chunked(us.docs.map(d=>d.ref), (b,r)=>b.delete(r));
+    await chunked(rs.docs.map(d=>d.ref), (b,r)=>b.delete(r));
+    say('dm-msg','전체 삭제했어요.',true);
+  }catch(e){ console.error(e); say('dm-msg','삭제에 실패했어요.'); }
+};
+
+/* ---------- 비밀번호 변경 ---------- */
+$('pw-save').onclick = async () => {
+  const o=$('pw-old').value, n=$('pw-new').value, n2=$('pw-new2').value;
+  if (n.length < 4) return say('pw-msg','새 비밀번호는 4자 이상이어야 해요.');
+  if (n !== n2) return say('pw-msg','새 비밀번호 확인이 달라요.');
+  if (await sha256(o) !== await getAdminHash()) return say('pw-msg','현재 비밀번호가 맞지 않아요.');
+  const h = await sha256(n);
+  await db.doc('config/admin').set({hash:h, updatedAt: firebase.firestore.FieldValue.serverTimestamp()});
+  sessionStorage.setItem(SKEY, h); ['pw-old','pw-new','pw-new2'].forEach(i=>$(i).value=''); say('pw-msg','비밀번호를 변경했어요.',true);
+};
+})();
+</script>
+</body>
+</html>
