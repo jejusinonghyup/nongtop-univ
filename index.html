@@ -88,12 +88,21 @@
         
         .rank-list { overflow-y: auto; flex-grow: 1; margin-bottom: 20px; border-top: 2px solid #eee; padding-top: 10px; }
         .rank-item { display: flex; justify-content: space-between; padding: 12px 10px; border-bottom: 1px solid #f0f0f0; align-items: center; border-radius: 8px;}
-        .rank-num { font-weight: 900; width: 55px; font-size: 14px;}
+        .rank-num { font-weight: 900; width: 55px; font-size: 14px; display: flex; align-items: center; min-height: 43px; padding-left: 4px; box-sizing: border-box; }
+        .medal-svg { filter: drop-shadow(0 2px 2px rgba(0,0,0,.25)); }
         .rank-name { flex-grow: 1; font-weight: 700; color: #333; text-align: left;}
         .rank-score { font-weight: 900; color: #ff6b00; text-align: right;}
     </style>
 </head>
 <body>
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+        <radialGradient id="mg-gold" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#fff6bf"/><stop offset=".55" stop-color="#ffc800"/><stop offset="1" stop-color="#c78a00"/></radialGradient>
+        <linearGradient id="mg-gold-rim" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe680"/><stop offset="1" stop-color="#a86e00"/></linearGradient>
+        <radialGradient id="mg-silver" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#ffffff"/><stop offset=".55" stop-color="#cfd6db"/><stop offset="1" stop-color="#8a959d"/></radialGradient>
+        <linearGradient id="mg-silver-rim" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f4f7f9"/><stop offset="1" stop-color="#74808a"/></linearGradient>
+        <radialGradient id="mg-bronze" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#ffe3c7"/><stop offset=".55" stop-color="#d98a4a"/><stop offset="1" stop-color="#94521d"/></radialGradient>
+        <linearGradient id="mg-bronze-rim" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f0b88a"/><stop offset="1" stop-color="#7d4318"/></linearGradient>
+    </defs></svg>
     <div id="game-container"></div>
     <div id="brand-watermark" aria-hidden="true"></div>
 
@@ -132,7 +141,7 @@
                     <div class="privacy-details">
                         - 수집 목적 : 랭킹전 참여 및 당첨자 안내<br>
                         - 수집 항목 : 닉네임, 휴대폰 뒷자리(4자리)<br>
-                        - 보유 기간 : <strong style="color: #ff6b00;">경품 지급 완료 후 즉시 파기</strong>
+                        - 보유 기간 : <strong style="color: #ff6b00;">상금/경품 지급 완료 후 즉시 파기</strong>
                     </div>
                 </div>
 
@@ -334,6 +343,21 @@
             document.getElementById('privacy-consent').checked = false; checkSession();
         }
 
+        // 금·은·동 메달 (리본 + 메달 + 등수)
+        function medalSvg(n) {
+            const g = ['gold', 'silver', 'bronze'][n - 1];
+            const ink = ['#7a5200', '#4a5560', '#5b3210'][n - 1];
+            return `<svg class="medal-svg" viewBox="0 0 36 46" width="34" height="43" aria-label="${n}위 메달">
+                <polygon points="7,0 16,0 23,18 14,18" fill="#d32f2f"/><polygon points="29,0 20,0 13,18 22,18" fill="#1e63c9"/>
+                <polygon points="7,0 11,0 18,18 14,18" fill="rgba(0,0,0,.18)"/><polygon points="29,0 25,0 18,18 22,18" fill="rgba(0,0,0,.18)"/>
+                <circle cx="18" cy="30" r="14.5" fill="url(#mg-${g}-rim)"/>
+                <circle cx="18" cy="30" r="11.8" fill="url(#mg-${g})"/>
+                <circle cx="18" cy="30" r="11.8" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1"/>
+                <ellipse cx="13.5" cy="24" rx="5" ry="2.6" fill="rgba(255,255,255,.45)" transform="rotate(-30 13.5 24)"/>
+                <text x="18" y="35.2" text-anchor="middle" font-size="15" font-weight="900" font-family="Pretendard, Arial, sans-serif" fill="${ink}">${n}</text>
+            </svg>`;
+        }
+
         function initLeaderboard() {
             if (!db) return;
             // 공개 랭킹(ranks)에는 닉네임·점수만 있고 개인정보는 없음. 동점이면 층수가 높은 순
@@ -357,7 +381,7 @@
                       const item = document.createElement('div');
                       item.className = 'rank-item' + (rank <= 3 ? ' top' + rank : '');
 
-                      const rankBadge = rank <= 3 ? `<span class="medal m${rank}">${rank}</span>` : `${rank}위`;
+                      const rankBadge = rank <= 3 ? medalSvg(rank) : `${rank}위`;
                       const isMe = userSession && userSession.nickname === user.nickname;
                       if (isMe) item.style.background = '#e6f4ea';
 
@@ -443,7 +467,7 @@
         // 스페셜 상품(발라먹차·레몬100·골드키위 양갱): 상품 이미지를 상자 옆면에 입힘 (special-skin.js)
         const SKIN = window.NT_SKIN;
         const specialProducts = SKIN.SPECIALS;
-        const H_SPECIAL = boxHeight * 2;   // 스페셜 상자는 2배 높이로, 이미지가 잘 보이게
+        const H_SPECIAL = boxHeight;       // 스페셜 상자도 다른 농산물 상자와 같은 높이
         const FORCE = (location.search.match(/[?&]special=(\w+)/) || [])[1];   // 테스트용: ?special=1 | tea | lemon | yang
         const normalProducts = [
             { name: '제주 감귤', emoji: '🍊', color: '#FFA500', textColor: '#FFFFFF' },
@@ -525,7 +549,7 @@
             const h = isSpecial ? H_SPECIAL : boxHeight;
 
             const box = new THREE.Mesh(new THREE.BoxGeometry(prev.width, h, prev.depth), isSpecial ? new THREE.MeshLambertMaterial({ color: 0xffffff }) : createTexture(itemData, false));
-            if (isSpecial) SKIN.apply(box, itemData, prev.width, prev.depth, h);
+            if (isSpecial) { SKIN.apply(box, itemData, prev.width, prev.depth, h); SKIN.addAura(box, prev.width, h, prev.depth); }
             box.castShadow = true; box.receiveShadow = true;
 
             movingAxis = currentFloor % 2 === 0 ? 'x' : 'z'; movingDir = Math.random() > 0.5 ? 1 : -1;
@@ -585,7 +609,7 @@
             const dSize = absDiff, dPos = newPos + (overlap / 2 + dSize / 2) * Math.sign(diff);
             const dMesh = new THREE.Mesh(new THREE.BoxGeometry(movingAxis === 'x' ? dSize : curr.width, curr.h, movingAxis === 'z' ? dSize : curr.depth), curr.mesh.material);
             dMesh.position.set(movingAxis === 'x' ? dPos : curr.mesh.position.x, curr.mesh.position.y, movingAxis === 'z' ? dPos : curr.mesh.position.z);
-            if (curr.isSpecial) SKIN.apply(curr.mesh, curr.sp, curr.width, curr.depth, curr.h, true);   // 줄어든 크기에 맞게 이미지 다시 맞춤 (조각은 기존 재질 유지)
+            if (curr.isSpecial) { SKIN.apply(curr.mesh, curr.sp, curr.width, curr.depth, curr.h, true); SKIN.updateAura(curr.mesh, curr.width, curr.h, curr.depth); }   // 줄어든 크기에 맞게 이미지 다시 맞춤 (조각은 기존 재질 유지)
             scene.add(dMesh); debris.push({ mesh: dMesh, vx: movingAxis === 'x' ? Math.sign(diff) * 0.1 : 0, vy: 0.05, vz: movingAxis === 'z' ? Math.sign(diff) * 0.1 : 0, rx: movingAxis === 'z' ? 0.07 * Math.sign(diff) : 0, rz: movingAxis === 'x' ? -0.07 * Math.sign(diff) : 0 });
 
             const gainedKg = Math.max(1, Math.floor(curr.width * curr.depth));
@@ -674,6 +698,8 @@
                 d.mesh.rotation.x += d.rx * timeScale; d.mesh.rotation.z += d.rz * timeScale; 
                 if (d.mesh.position.y < -30) { scene.remove(d.mesh); debris.splice(i, 1); }
             }
+            const tt = performance.now() / 1000;
+            for (let i = 0; i < boxes.length; i++) { if (boxes[i].isSpecial) SKIN.tick(boxes[i].mesh, tt); }
             renderer.render(scene, camera);
         }
     </script>
